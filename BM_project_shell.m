@@ -7,10 +7,7 @@ addpath(genpath('C:/Users/sarah/OneDrive/Documents/MATLAB/BayesianModeling/Proje
 subs = [1 2 4:8 10:41 98 99]; %hard-coded to get subjects included in original analyses
 excl = [4     8    10    24    25    30];
 subs(excl)=[];
-N = length(subs); %limit for now to shorten run time
-max_iter = 16; % maximum iterations of a stim
-probs = [1 1 2 1 2 2 1 2 1 2 1 1 2 1]; % reliability condition
-
+N = length(subs); 
 % load data in to get responses, stimuli, block numbers, etc.
 
 %for reference, data.Code is response
@@ -91,12 +88,12 @@ title('Learning curve for RL w/ forgetting')
 fig = gcf; fig.Color = 'w';
 
 % SAME AS ABOVE, but for BM NOW!
-fitflag = true;
+fitflag = false;
 clear simdata fitparams
 % Use all of this to do a gen/rec with an BM model
 % global k
 maxk = 15; ks = ceil(rand(N,1)*maxk); 
-BMparams = [normrnd(3,0.5,N,1) normrnd(0.1,0.1,N,1)]; %beta, then k
+BMparams = [normrnd(3,0.5,N,1) normrnd(0.3,0.1,N,1)]; %beta, then k
 BMparams(BMparams(:,2)<0,2) = 0; % don't let forget rate be negative, ever
 BMparamnames = {'\beta','forget','k'}; 
 nparamsBM = size(BMparams,2);
@@ -151,7 +148,7 @@ end
 %% Fit real data & see how the numbers come out
 niters = 20;
 clear tries nllhs summary_k_fits simdata fitks ks
-fitflag = true;
+fitflag = false;
 if fitflag %want to run? it'll take forever!
     for s = 1:N
         onesubj = data{s}; tries_RL = []; nllhs_tries_RL = []; tries_BM = []; nllhs_tries_BM = [];
