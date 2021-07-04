@@ -10,7 +10,7 @@ subs(excl)=[];
 N = length(subs); 
 % load data in to get responses, stimuli, block numbers, etc.
 
-%for reference, data.Code is response
+% for reference, data.Code is response
 % data.Cor is the correctness of that response
 % data.Rew is whether they got a +1 or a 0 
 % data.seq is the stimulus they saw
@@ -88,37 +88,44 @@ title('Learning curve for RL w/ forgetting')
 fig = gcf; fig.Color = 'w';
 
 % SAME AS ABOVE, but for BM NOW!
-fitflag = false;
-clear simdata fitparams
+fitflag = true;
+clear simdata fitparams tries nllhs_tries nllhs
 % Use all of this to do a gen/rec with an BM model
-% global k
-maxk = 15; ks = ceil(rand(N,1)*maxk); 
-BMparams = [normrnd(3,0.5,N,1) normrnd(0.3,0.1,N,1)]; %beta, then k
-BMparams(BMparams(:,2)<0,2) = 0; % don't let forget rate be negative, ever
+maxk = 15; global k; ks = ceil(rand(N,1)*maxk); 
+BMparams = [normrnd(2.06,0.4,N,1) normrnd(0.103,0.07,N,1)]; %beta, then forget rate
+BMparams(BMparams(:,2)<0,2) = 0.01; % don't let forget rate be negative, ever
 BMparamnames = {'\beta','forget','k'}; 
 nparamsBM = size(BMparams,2);
+niters = 5; %5 seems to be where fitting curve stabilizes at a min
+
+% find parameters which produce reasonable curves (separation between ns
+% conditions) and then do gen/rec with those
 if fitflag %don't run this whole thing unless you have to
     for s = 1:N
-        k = ks(s);
-        simdata{s} = simBM_v02(BMparams(s,:),data{s}); %ks(s);
+        %k = ks(s);
+        tries{s} = []; nllhs_tries{s} = []; %save for simpler BM model
+        tries_v02{s} = []; nllhs_tries_v02{s} = []; summary_k_fits = []; %save for metalearning BM model
+        lb = zeros(1,nparamsBM); ub = ones(1,nparamsBM);
+%         simdata_v02{s} = simBM_v02(BMparams(s,:),data{s});
+%         onesubj = simdata_v02{s};
+%         for ii = 1:niters %use xx starting points per subject... recovery is not very consistent for BM, compared to RL
+%             inits = rand(1,nparamsBM); 
+%             [tries_v02{s}(ii,:),nllhs_tries_v02{s}(ii,:)] = fmincon(@get_nllh_BM_v02,inits,[],[],[],[],lb,ub);
+%         end
+        simdata{s} = simBM_v02(BMparams(s,:),data{s});
         onesubj = simdata{s};
-        inits = rand(1,nparamsBM); tries = []; nllhs_tries = []; summary_k_fits = [];
-        %for k = 1:maxk
-            for ii = 1:20 %use xx starting points per subject... it's not very consistent for BM, compared to RL
-                inits = rand(1,nparamsBM); lb = zeros(1,nparamsBM); ub = ones(1,nparamsBM);
-                %[tries(ii,:,k),nllhs_tries(ii,k)] = fmincon(@get_nllh_BM_v02,inits,[],[],[],[],lb,ub);
-                [tries(ii,:),nllhs_tries(ii,:)] = fmincon(@get_nllh_BM_v02,inits,[],[],[],[],lb,ub);
-            end
-        %end
-%         summary_k_fits = min(nllhs_tries,[],1); % which k gave the best score, overall? 
-%         [~,fitk(s)] = min(summary_k_fits);
-%         nllhs_tries = nllhs_tries(:,fitk(s)); tries = tries(:,:,fitk(s));
-        [nllhs(s),which] = min(nllhs_tries);fitparams(s,:) = tries(which,:); %save best of all tries for each subject
+        for ii = 1:niters
+            inits = rand(1,nparamsBM); 
+            [tries{s}(ii,:),nllhs_tries{s}(ii,:)] = fmincon(@get_nllh_BM,inits,[],[],[],[],lb,ub);
+        end
+        [nllhs(s),which] = min(nllhs_tries{s});fitparams(s,:) = tries{s}(which,:); %save best of all tries for each subject
+%         [nllhs_v02(s),which] = min(nllhs_tries_v02{s});fitparams_v02(s,:) = tries_v02{s}(which,:); %save best of all tries for each subject
     end
 else
-    %load('BM_genrec.mat');
-    load('BM_genrec_v02.mat')
+    load('BM_genrec.mat');
+    %load('BM_genrec_v02.mat')
 end
+
 % Plot learning curves for simulated bayesian subjects
 subplot(1,3,3)
 SLM_plot_learningcurves(simdata)
@@ -127,7 +134,7 @@ fig = gcf; fig.Color = 'w';
 
 figure
 % %plot generate/recover from BM model
-fitparams(:,1) = fitparams(:,1)*100;
+fitparams(:,1) = fitparams(:,1)*10;
 for p = 1:nparamsBM
     subplot(1,2,p)
     scatter(BMparams(:,p),fitparams(:,p),'Filled')
@@ -139,6 +146,18 @@ for p = 1:nparamsBM
     ax = gca; ax.FontSize = 10;
 end
 
+figure
+fitparams_v02(:,1) = fitparams_v02(:,1)*10;
+for p = 1:nparamsBM
+    subplot(1,2,p)
+    scatter(BMparams(:,p),fitparams_v02(:,p),'Filled')
+    hold on
+    plot([0 1],[0 1],'k--')
+    title(['BI param ' BMparamnames{p} ' (v2)'])
+    xlabel('Real param val')
+    ylabel('Fit param val')
+    ax = gca; ax.FontSize = 10;
+end
 % subplot(2,2,p+1)
 % scatter(ks,fitk)
 % xlabel('Real K value')
@@ -146,29 +165,29 @@ end
 % fig = gcf; fig.Color = 'w';
 
 %% Fit real data & see how the numbers come out
-niters = 20;
+niters = 5;
 clear tries nllhs summary_k_fits simdata fitks ks
-fitflag = false;
+fitflag = true;
 if fitflag %want to run? it'll take forever!
-    for s = 1:N
-        onesubj = data{s}; tries_RL = []; nllhs_tries_RL = []; tries_BM = []; nllhs_tries_BM = [];
-        for ii = 1:niters-4 %use xx starting points per subject... it's pretty consistent tho
+    parfor s = 1:N
+        onesubj = data{s}; tries_RL{s} = []; nllhs_tries_RL{s} = []; tries_BM{s} = []; nllhs_tries_BM{s} = [];
+        for ii = 1:niters %use xx starting points per subject... it's pretty consistent tho
             inits = rand(1,nparamsRL); 
-            [tries_RL(ii,:),nllhs_tries_RL(ii)] = fmincon(@get_nllh_RL,inits,[],[],[],[],zeros(1,nparamsRL),ones(1,nparamsRL));
+            [tries_RL{s}(ii,:),nllhs_tries_RL{s}(ii)] = fmincon(@get_nllh_RL,inits,[],[],[],[],zeros(1,nparamsRL),ones(1,nparamsRL));
         end %iterate over RL values
 %         summary_k_fits = [];
 %         for k = 1:maxk
             for ii = 1:niters %use xx starting points per subject... it's not very consistent for BM, compared to RL
                 inits = rand(1,nparamsBM); 
                 %[tries(ii,k),nllhs_tries(ii,k)] = fmincon(@get_nllh_BM,inits,[],[],[],[],zeros(1,nparamsBM),ones(1,nparamsBM));
-                [tries_BM(ii,:),nllhs_tries_BM(ii,:)] = fmincon(@get_nllh_BM_v02,inits,[],[],[],[],zeros(1,nparamsBM),ones(1,nparamsBM));
+                [tries_BM{s}(ii,:),nllhs_tries_BM{s}(ii,:)] = fmincon(@get_nllh_BM,inits,[],[],[],[],zeros(1,nparamsBM),ones(1,nparamsBM));
             end
 %         end
 %         summary_k_fits = min(nllhs_tries,[],1); % which k gave the best score, overall? 
 %         [~,fitk(s)] = min(summary_k_fits);
 %         nllhs_tries = nllhs_tries(:,fitk(s)); tries_BM = tries(:,fitk(s));
-        [nllhs_BM(s,:),which] = min(nllhs_tries_RL); fitparams_BM(s,:) = tries_BM(which,:); 
-        [nllhs_RL(s,:),which] = min(nllhs_tries_RL); fitparams_RL(s,:) = tries_RL(which,:); %save best of all tries for each subject
+        [nllhs_BM(s,:),which] = min(nllhs_tries_BM{s}); fitparams_BM(s,:) = tries_BM{s}(which,:); 
+        [nllhs_RL(s,:),which] = min(nllhs_tries_RL{s}); fitparams_RL(s,:) = tries_RL{s}(which,:); %save best of all tries for each subject
     end
 else
     %load('realfits.mat')
@@ -206,7 +225,7 @@ xticklabels({'RL','BI'})
 fig = gcf; fig.Color = 'w';
 
 % % Re-plot learning curves based on fit parameter values
-fitparams_BM(:,1) = fitparams_BM(:,1)*100;
+fitparams_BM(:,1) = fitparams_BM(:,1)*10;
 for s = 1:N
     simdataRL{s} = simRL(fitparams_RL(s,:),data{s});
 %    k = fitk(s);
@@ -233,14 +252,6 @@ xlabel('Stimulus iterations')
 ylabel('p(correct)')
 fig = gcf; fig.Color = 'w';
 ax = gca; ax.FontSize = 10;
-
-for n = 1:4
-    [r,p] = corr(nbackacc(:,n),fitk'); % does fit capacity correlate with accuracy on the n-back?
-    disp(['corr ' num2str(n+1) '-back acc & fit K parameter: r = ' num2str(r) ', p = ' num2str(p)])
-end
-nseffect = nbackacc(:,1)-nbackacc(:,3);
-[r,p] = corr(nseffect,fitk'); % does fit capacity correlate with accuracy on the n-back?
-disp(['corr set size effect & fit K parameter: r = ' num2str(r) ', p = ' num2str(p)])
 
 % %% OBSOLETE! Run a little thing over utility of each action (selecting each class)
 % 

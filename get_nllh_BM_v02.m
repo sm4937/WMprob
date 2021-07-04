@@ -3,7 +3,7 @@ function [nllh] = get_nllh_BM_v02(params)
 % code written into overarching model-fitting framework by Sarah Master,
 % 2021
 % the parameters of simplest version are forget rate, and decision noise (beta)
-beta = params(1)*100;
+beta = params(1)*10;
 forget = params(2);
 % if there are more free parameters, they are the p_reward_believed for
 % each probability condition
@@ -26,7 +26,8 @@ for b = 1:length(unique(data.block))
     resp_vec = data.resp(data.block==b);
     p_reward_true = unique(data.prew(data.block==b));
     p_reward_believed = p_reward_true;
-    p_false = (1-p_reward_believed)./(1-p_reward_believed + 1); %probability of getting 0 given you chose correctly is probability 
+    p_false = 0; %probability of getting 1 given you chose incorrectly
+    p_0 = (1-p_reward_believed)./(1-p_reward_believed + 1); %probability of getting 0 given you chose correctly is probability 
     ns = length(unique(stims));
     
     if ns == 6
@@ -68,22 +69,22 @@ for b = 1:length(unique(data.block))
         end
 
         % Reward
-        if cor_vec(t,:)
-            r = rewards(t);
-        else
-            r = 0;
-        end
+        r = rewards(t);
         
         % Updating the posterior
         idx = find(allC(:,i)==C_hat);
         if r == 1
-            like = p_false * ones(numC, 1);
-            like(idx) = p_reward_believed;
+%           like = p_false * ones(numC, 1); %p_false is probability of a wrong choice being rewarded
+%           like(idx) = p_reward_believed;
+            like = p_false./2 * ones(numC,1);
+            like(idx) = 1-p_false; %100 percent chance you chose correctly if r = 1
         else
-            like = (1-p_false) * ones(numC,1);
-            like(idx) = 1-p_reward_believed;
+            %like = (1-p_false) * ones(numC,1);
+            %like(idx) = 1-p_reward_believed;
+            like = (1-p_0)./2 * ones(numC,1);
+            like(idx) = p_0; %p_0 chance you chose correctly if r = 0
         end
-
+        
         posterior = posterior .* like;
         posterior = posterior/sum(posterior);
 

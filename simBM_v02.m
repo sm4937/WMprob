@@ -6,7 +6,7 @@ function [simdata] = simBM_v02(params,data)
 beta = params(1);
 forget = params(2);
 % if there are more free parameters, they are the p_reward_believed for
-% each probability condition
+% each probability condition, p_false_believed
 % i.e. p_reward_believed
 
 K = sum(unique(data.resp)>0); %in other code, this variable is called na
@@ -17,8 +17,10 @@ for b = 1:length(unique(data.block))
     key_vec = data.coract(data.block==b); %key, correct answers
     p_reward_true = unique(data.prew(data.block==b));
     p_reward_believed = p_reward_true;
-    p_false = (1-p_reward_believed)./(1-p_reward_believed + 1); %probability of getting 0 given you chose correctly is probability 
-    ns = length(unique(stims));
+    p_0 = (1-p_reward_believed)./(1-p_reward_believed + 1); %probability of getting 0 given you chose correctly 
+    p_false = 0; %probability of getting reward given you chose incorrectly
+    ns = length(unique(stims)); 
+    iter = 0; %bookkeeping for plotting posterior evolution for one stim
     if ns == 6
         NperK = ns/K;
         % this code works for ns6, written by Wei Ji
@@ -69,19 +71,47 @@ for b = 1:length(unique(data.block))
         % Updating the posterior
         idx = find(allC(:,i)==C_hat);
         if r == 1
-            like = p_false * ones(numC, 1);
-            like(idx) = p_reward_believed;
+%           like = p_false * ones(numC, 1); %p_false is probability of a wrong choice being rewarded
+%           like(idx) = p_reward_believed;
+            like = p_false./2 * ones(numC,1);
+            like(idx) = 1-p_false; %100 percent chance you chose correctly if r = 1
         else
-            like = (1-p_false) * ones(numC,1);
-            like(idx) = 1-p_reward_believed;
+            %like = (1-p_false) * ones(numC,1);
+            %like(idx) = 1-p_reward_believed;
+            like = (1-p_0)./2 * ones(numC,1);
+            like(idx) = p_0; %p_0 chance you chose correctly if r = 0
         end
 
         posterior = posterior .* like;
         posterior = posterior/sum(posterior);
-
+        
         % Forgetting
         posterior = (1-forget)* posterior + forget* prior;
+        
+        % visualize the evolution of the posterior trial-by-trial for one
+        % stimulus, as a test case
+%         figure(3)
+%         if i == 1 %first stimulus of the bunch, only
+%             iter = iter+1;
+%             subplot(3,5,iter)
+%             barcolors = {'b','b','b'};
+%             if r == 1
+%                 barcolors{C_hat} = 'g';
+%             else
+%                 barcolors{C_hat} = 'r';
+%             end
+%             marginal = NaN(1,K); %re-compute p_resp
+%             for j = 1:K % loops over possible choices
+%                 marginal(j) = sum(posterior(allC(:,i)==j));
+%             end
+%             p_resp = marginal.^beta;
+%             p_resp = p_resp/sum(p_resp);
+%             bar(1,p_resp(1),barcolors{1}); hold on; 
+%             bar(2,p_resp(2),barcolors{2}); bar(3,p_resp(3),barcolors{3});
+%             ylim([0 1]);
+%         end
     end % of each trial
+    % close 3
     %store information for analysis of the simulation behavior later on
     rewards_sim = [rewards_sim; rewards]; resp_sim = [resp_sim; resp_vec];
     cor_sim = [cor_sim; cor_vec];

@@ -15,7 +15,6 @@ function [simdata] = simBM(params,data)
 global k
 beta = params(1); %higher beta -> more greediness
 forget = params(2);
-metalearning = false;
 
 na = sum(unique(data.resp)>0);
 rewards_sim = []; resp_sim = []; cor_sim = [];
@@ -27,8 +26,8 @@ for b = 1:length(unique(data.block))
     p_0 = (1-p_reward)./(1-p_reward + 1); %probability of getting 0 given you chose correctly is probability 
     ns = length(unique(stims));
 
-    p = ones(ns,na)./na; %initialize with equal values at start of each block
-    x = ones(ns,na); % no evidence, no priors
+    prior = ones(ns,na)./na; p = prior;
+     %initialize with equal values at start of each block
     resp_vec = []; cor_vec = []; %for storing responses by block
     for trial = 1:sum(data.block==b) %ntrials
         stim = stims(trial); %which stimulus is it?
@@ -52,58 +51,48 @@ for b = 1:length(unique(data.block))
         if key_vec(trial) == resp %correct response, give pre-determined feedback
             r = rew;
             cor_vec(trial,:) = 1;
-        else %they were wrong
+        else %they were wrongs
             r = 0;
             cor_vec(trial,:) = 0;
         end
         rewards(trial) = r; %overwrite with rewards this simulated dude is getting
         % learn!
-        %likelihood changes, starts out totally uninformative
-        x = cat(3,ones(size(p)),x);
+        %likelihood changes
+        x = ones(size(p)); %starts out totally uninformative
         if r == 1
-            x(stim,resp,1) = 1;
+            x(stim,resp) = 1;
             notaction = [1 2 3]; notaction(resp) = [];
-            x(stim,notaction,1) = 0;
+            x(stim,notaction) = 0;
         elseif r == 0
-            x(stim,resp,1) = p_0; %probably of not getting rewarded this block
+            x(stim,resp) = p_0; %probably of not getting rewarded this block
             notaction = [1 2 3]; notaction(resp) = [];
-            x(stim,notaction,1) = (1-p_0)/2;
+            x(stim,notaction) = (1-p_0)/2;
         end
         
         % given data in x so far, update p of each category for each
         % stimulus
-        p = ones(ns,na)./na; %initialize with flat prior before inference for each trial
-        for tt = 1:size(x,3) %loop over REMEMBERED trials
-            p = p.*x(:,:,tt); %update w likelihood of x if category
-            p = p./sum(p,2); %normalize rows
-        end
+        %p = ones(ns,na)./na; %initialize with flat prior before inference for each trial
+        %for tt = 1:size(x,3) %loop over REMEMBERED trials
+        %    p = p.*x(:,:,tt); %update w likelihood of x if category
+        %    p = p./sum(p,2); %normalize rows
+        %end
         % posterior gets completely re-updated every trial, since some info
         % gets corrupted
         
-        %decay to priors with forget parameter
-        if length(params)>1 %then there is a forget parameter
-            prior = ones(ns,na)./na;
-            p = (1-forget)*p + forget*prior;
-        end
+        %given new x, update posterior
+        p = p.*x;
+        p = p./sum(p,2);
         
-        if ns == 6 & metalearning
-            % on set size 6 blocks, do some meta-learning in terms of class
-            % priors
-            prior = ones(ns,na)./na;
-            occurrences = sum(p==1);
-            prior(:,occurrences==2) = 0;
-            solved = sum(p==1,2)==1; %make solved a boolean index
-            prior(solved,:) = 1;
-            proto = p.*prior;
-            p = proto./sum(proto,2);
-        end
+        %decay to priors with forget parameter
+        p = (1-forget)*p + forget*prior;
+        % ^ this is replacing the hard capacity limits
 
         % update memory, wipe some
         %according to k, what's susceptible to distortion?
         %vulnerable = 1:size(x,3) > k; 
         %flip = find(rand(sum(vulnerable),1)>0.5); %above capacity, drop with 50% probability
         %chance of information loss
-        x(:,:,k+1:end) = []; %for now, delete info randomly above k
+        %x(:,:,k+1:end) = []; %for now, delete info randomly above k
         %assign random p? randomly assign 0 or 1? 
       
     end %end of trial by trial loop

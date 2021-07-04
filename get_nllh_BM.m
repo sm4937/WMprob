@@ -8,9 +8,8 @@ llh = 0;
 
 global k onesubj
 data = onesubj; 
-beta = params(1)*100; %higher beta -> more greediness
+beta = params(1)*10; %higher beta -> more greediness
 forget = params(2);
-metalearning = false; 
 
 na = sum(unique(data.resp)>0);
 rewards_sim = []; resp_sim = []; cor_sim = [];
@@ -25,8 +24,7 @@ for b = 1:length(unique(data.block))
     % incorrectly and got 0 (1)
     ns = length(unique(stims));
 
-    p = ones(ns,na)./na; %initialize with equal values at start of each block
-    x = ones(ns,na,1); % no evidence, no priors
+    prior = ones(ns,na)./na; p = prior;
     for trial = 1:sum(data.block==b) %ntrials
         stim = stims(trial); %which stimulus is it?
         % run softmax, choose action
@@ -38,61 +36,44 @@ for b = 1:length(unique(data.block))
             llh = llh + log(p_a);
         end
         %get reward from sequence
-        rew = rewards(trial);
-        if cor_vec(trial) %correct response, give pre-determined feedback
-            r = rew;
-        else %they were wrong
-            r = 0;
-        end
+        r = rewards(trial);
         % learn!
-        %likelihood changes, starts out totally uninformative
-        x = cat(3,ones(size(p)),x);
+        %likelihood changes
+        x = ones(size(p)); %starts out totally uninformative
         if resp > 0 %non-response trials, don't do any inference
             if r == 1
-                x(stim,resp,1) = 1;
+                x(stim,resp) = 1;
                 notaction = [1 2 3]; notaction(resp) = [];
-                x(stim,notaction,1) = 0;
+                x(stim,notaction) = 0;
             elseif r == 0
                 x(stim,resp,1) = p_0; %probably of not getting rewarded this block
                 notaction = [1 2 3]; notaction(resp) = [];
-                x(stim,notaction,1) = (1-p_0)/2;
+                x(stim,notaction) = (1-p_0)/2;
             end
         end
         
         % given data in x so far, update p of each category for each
         % stimulus
-        p = ones(ns,na)./na; %initialize with flat prior before inference for each trial
-        for tt = 1:size(x,3) %loop over REMEMBERED trials
-            p = p.*x(:,:,tt); %update w likelihood of x if category
-            p = p./sum(p,2); %normalize rows
-        end
+%         p = ones(ns,na)./na; %initialize with flat prior before inference for each trial
+%         for tt = 1:size(x,3) %loop over REMEMBERED trials
+%             p = p.*x(:,:,tt); %update w likelihood of x if category
+%             p = p./sum(p,2); %normalize rows
+%         end
         % posterior gets completely re-updated every trial, since some info
         % gets corrupted
         
-        %decay to priors w forget parameter
-        if length(params)>1 %then there is a forget parameter
-            prior = ones(ns,na)./na;
-            p = (1-forget)*p + forget*prior;
-        end
+        p = p.*x; %update w new likelihood
+        p = p./sum(p,2); %normalize rows
         
-        if ns == 6 & metalearning
-            % on set size 6 blocks, do some meta-learning in terms of class
-            % priors
-            prior = ones(ns,na)./na;
-            occurrences = sum(p==1);
-            prior(:,occurrences==2) = 0;
-            solved = sum(p==1,2)==1; %make solved a boolean index
-            prior(solved,:) = 1;
-            proto = p.*prior;
-            p = proto./sum(proto,2);
-        end 
-
+        %decay to priors w forget parameter
+        p = (1-forget)*p + forget*prior;
+        
         % update memory, wipe some
         %according to k, what's susceptible to distortion?
         %vulnerable = 1:size(x,3) > k; 
-        %flip = find(rand(sum(vulnerable),1)>0.5); %above capacity, drop with 50% probability
+        %flip = find(rand(sum(vulnerable),3)>0.5); %above capacity, drop with 50% probability
         %chance of information loss
-        x(:,:,k+1:end) = []; %for now, delete ANY info above k
+        % x(:,:,k+1:end) = []; %for now, delete ANY info above k
         %assign random p? randomly assign 0 or 1?
         
     end %end of trial by trial loop
