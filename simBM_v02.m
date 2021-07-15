@@ -1,10 +1,18 @@
-function [simdata] = simBM_v02(params,data)
+function [simdata] = simBM_v02(params,data,model)
 % a revised BM with specification & code written by Wei Ji Ma, 2021
 % code written into overarching model-fitting framework by Sarah Master,
 % 2021
-% the parameters of simplest version are forget rate, and decision noise (beta)
-beta = params(1);
-forget = params(2);
+beta = 100; forget = 0; epsilon = 0;
+if sum(contains(model,'beta'))
+    beta = params(contains(model,'beta'));
+end
+if sum(contains(model,'forget'))
+    forget = params(contains(model,'forget'));
+end
+if sum(contains(model,'epsilon'))
+    epsilon = params(contains(model,'epsilon'));
+end
+
 % if there are more free parameters, they are the p_reward_believed for
 % each probability condition, p_false_believed
 % i.e. p_reward_believed
@@ -20,7 +28,6 @@ for b = 1:length(unique(data.block))
     p_0 = (1-p_reward_believed)./(1-p_reward_believed + 1); %probability of getting 0 given you chose correctly 
     p_false = 0; %probability of getting reward given you chose incorrectly
     ns = length(unique(stims)); 
-    iter = 0; %bookkeeping for plotting posterior evolution for one stim
     if ns == 6
         NperK = ns/K;
         % this code works for ns6, written by Wei Ji
@@ -54,7 +61,7 @@ for b = 1:length(unique(data.block))
         end
 
         p_resp = marginal.^beta;
-        p_resp = p_resp/sum(p_resp);
+        p_resp = epsilon/K + (1-epsilon)*(p_resp/sum(p_resp));
         C_hat = randsample(1:K,1,true,p_resp);
         % Correctness
         resp_vec(t,:) = C_hat;
@@ -88,28 +95,6 @@ for b = 1:length(unique(data.block))
         % Forgetting
         posterior = (1-forget)* posterior + forget* prior;
         
-        % visualize the evolution of the posterior trial-by-trial for one
-        % stimulus, as a test case
-%         figure(3)
-%         if i == 1 %first stimulus of the bunch, only
-%             iter = iter+1;
-%             subplot(3,5,iter)
-%             barcolors = {'b','b','b'};
-%             if r == 1
-%                 barcolors{C_hat} = 'g';
-%             else
-%                 barcolors{C_hat} = 'r';
-%             end
-%             marginal = NaN(1,K); %re-compute p_resp
-%             for j = 1:K % loops over possible choices
-%                 marginal(j) = sum(posterior(allC(:,i)==j));
-%             end
-%             p_resp = marginal.^beta;
-%             p_resp = p_resp/sum(p_resp);
-%             bar(1,p_resp(1),barcolors{1}); hold on; 
-%             bar(2,p_resp(2),barcolors{2}); bar(3,p_resp(3),barcolors{3});
-%             ylim([0 1]);
-%         end
     end % of each trial
     % close 3
     %store information for analysis of the simulation behavior later on

@@ -103,7 +103,7 @@ BMparams(BMparams(:,1)<0,1) = 0.01; % don't let epsilon be negative, either
 nparamsBM = length(model);
 lb = zeros(1,nparamsBM); ub = ones(1,nparamsBM);
 niters = 5; %5 seems to be where fitting curve stabilizes at a min
-tries = cell(N,1); nllhs_tries = cell(N,1);
+tries = cell(1,N); nllhs_tries
 
 % find parameters which produce reasonable curves (separation between ns
 % conditions) and then do gen/rec with those
@@ -111,7 +111,7 @@ fitflag = true;
 if fitflag %don't run this whole thing unless you have to
     for s = 1:N
         k = ks(s);
-        tries{s} = NaN(niters,nparamsBM); nllhs_tries{s} = NaN(niters,1); %save for simpler BM model
+        tries{s} = NaN(niters,nparamsBM); nllhs_tries{s} = NaN(niters,nparamsBM); %save for simpler BM model
         simdata{s} = simBM_v02(BMparams(s,:),data{s},model);
         onesubj = simdata{s};
         for ii = 1:niters
@@ -187,26 +187,26 @@ niters = 5;
 clear tries nllhs
 k = 0;
 
-tries_RL = cell(N,1); nllhs_tries_RL = cell(N,1);
-tries_BM = cell(N,1); nllhs_tries_BM = cell(N,1);
-tries_RLWM = cell(N,1); nllhs_tries_RLWM = cell(N,1);
+tries_RL = cell(1,N); nllhs_tries_RL = cell(1,N);
+tries_BM = cell(1,N); nllhs_tries_BM = cell(1,N);
+tries_RLWM = cell(1,N); nllhs_tries_RLWM = cell(N);
 
 fitflag = true;
 if fitflag %want to run? it'll take forever!
     for s = 1:N
-        onesubj = data{s}; tries_RL{s} = NaN(niters,nparamsRL); nllhs_tries_RL{s} = NaN(niters,1); 
+        onesubj = data{s}; tries_RL{s} = NaN(niters,nparamsRL); nllhs_tries_RL{s} = NaN(niters,nparamsRL); 
         for ii = 1:niters %use xx starting points per subject... it's pretty consistent tho
             inits = rand(1,nparamsRL); 
-            [tries_RL{s}(ii,:),nllhs_tries_RL{s}(ii,:)] = fmincon(@get_nllh_RL,inits,[],[],[],[],zeros(1,nparamsRL),ones(1,nparamsRL));
+            [tries_RL{s}(ii,:),nllhs_tries_RL{s}(ii)] = fmincon(@get_nllh_RL,inits,[],[],[],[],zeros(1,nparamsRL),ones(1,nparamsRL));
         end %iterate over RL values
         model = {'epsilon','forget'};
-        tries_BM{s} = NaN(niters,nparamsBM); nllhs_tries_BM{s} = NaN(niters,1);
+        tries_BM{s} = NaN(niters,nparamsBM); nllhs_tries_BM{s} = NaN(niters,nparamsBM);
         for ii = 1:niters %use xx starting points per subject... it's not very consistent for BM, compared to RL
             inits = rand(1,nparamsBM); 
             [tries_BM{s}(ii,:),nllhs_tries_BM{s}(ii,:)] = fmincon(@get_nllh_BM_v02,inits,[],[],[],[],zeros(1,nparamsBM),ones(1,nparamsBM));
         end
         model = {'epsilon','alpha','rho3','rho6','forget'};
-        tries_RLWM{s} = NaN(niters,nparamsRLWM); nllhs_tries_RLWM{s} = NaN(niters,1);
+        tries_RLWM{s} = NaN(niters,nparamsRLWM); nllhs_tries_RLWM{s} = NaN(niters,nparamsRLWM);
         for ii = 1:niters+10 %use xx starting points per subject... it's not very consistent for BM, compared to RL
             inits = rand(1,nparamsRLWM); 
             [tries_RLWM{s}(ii,:),nllhs_tries_RLWM{s}(ii,:)] = fmincon(@get_nllh_RLWM,inits,[],[],[],[],zeros(1,nparamsRLWM),ones(1,nparamsRLWM));

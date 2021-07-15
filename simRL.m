@@ -19,20 +19,7 @@ for b = 1:length(unique(data.block))
         stim = stims(trial); %which stimulus is it?
         % run softmax, choose action
         p_softmax = epsilon/na + (1-epsilon)*(exp(q(stim,:).*beta)./sum(exp(q(stim,:).*beta))); %get probabilities 
-        x = rand;
-        % how to implement e-greedy? 
-%         counts = histc(x,[0 cumsum(p_softmax)]); % Setting up bins of prob intervals, which one is rand number "x" in?
-%         resp = find(counts==1);
-        cum_dist = cumsum(p_softmax);
-        if x < epsilon
-            resp = ceil(rand()*3);
-        elseif x < cum_dist(1) %forget the hist thing and just do an if statement
-            resp = 1;
-        elseif x < cum_dist(2)
-            resp = 2;
-        else
-            resp = 3;
-        end
+        resp = randsample(1:na,1,true,p_softmax);
         resp_vec(trial,:) = resp;
         
         %get reward from sequence

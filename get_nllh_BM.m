@@ -1,17 +1,25 @@
 function [nllh] = get_nllh_BM(params)
-% fit WMP data with BM model 
+% fit WMP data with Bayesian Model (BI) 
 % Where x is all the reward information you have for that stimulus
 llh = 0;
 %p(C|x) = U_C*p(C)*p(x|C)
 %p(C|x_vec) = U_C*p(C)*p(x_1|C)*p(x_2|C)*...*p(x_t|C)
 %uninformative prior, re-update posterior every time, don't just learn
 
-global k onesubj
+global k onesubj model
 data = onesubj; 
-beta = params(1)*10; %higher beta -> more greediness
-forget = params(2);
+beta = 100; forget = 0; epsilon = 0;
+if sum(contains(model,'beta'))
+    beta = params(contains(model,'beta'))*100;
+end
+if sum(contains(model,'forget'))
+    forget = params(contains(model,'forget'));
+end
+if sum(contains(model,'epsilon'))
+    epsilon = params(contains(model,'epsilon'));
+end
 
-na = sum(unique(data.resp)>0);
+K = sum(unique(data.resp)>0);
 rewards_sim = []; resp_sim = []; cor_sim = [];
 for b = 1:length(unique(data.block))
     stims = data.stim(data.block==b); %stimuli
@@ -24,11 +32,11 @@ for b = 1:length(unique(data.block))
     % incorrectly and got 0 (1)
     ns = length(unique(stims));
 
-    prior = ones(ns,na)./na; p = prior;
+    prior = ones(ns,K)./K; p = prior;
     for trial = 1:sum(data.block==b) %ntrials
         stim = stims(trial); %which stimulus is it?
         % run softmax, choose action
-        p_softmax = (exp(p(stim,:).*beta)./sum(exp(p(stim,:).*beta))); %get probabilities 
+        p_softmax = epsilon/K + (1-epsilon)*(exp(p(stim,:).*beta)./sum(exp(p(stim,:).*beta))); %get probabilities 
         
         resp = resp_vec(trial);
         if resp > 0
@@ -52,29 +60,25 @@ for b = 1:length(unique(data.block))
             end
         end
         
-        % given data in x so far, update p of each category for each
-        % stimulus
-%         p = ones(ns,na)./na; %initialize with flat prior before inference for each trial
-%         for tt = 1:size(x,3) %loop over REMEMBERED trials
-%             p = p.*x(:,:,tt); %update w likelihood of x if category
-%             p = p./sum(p,2); %normalize rows
-%         end
-        % posterior gets completely re-updated every trial, since some info
-        % gets corrupted
-        
-        p = p.*x; %update w new likelihood
-        p = p./sum(p,2); %normalize rows
-        
+        if k > 0 
+            % given data in x so far, update p of each category for each
+            % stimulus
+            p = ones(ns,K)./K; %initialize with flat prior before inference for each trial
+            for tt = 1:size(x,3) %loop over REMEMBERED trials
+                p = p.*x(:,:,tt); %update w likelihood of x if category
+                p = p./sum(p,2); %normalize rows
+            end
+            % posterior gets completely re-updated every trial, since some info
+            % gets corrupted
+        else %update posterior from previous posterior
+            p = p.*x; %update w new likelihood
+            p = p./sum(p,2); %normalize rows
+        end
         %decay to priors w forget parameter
         p = (1-forget)*p + forget*prior;
         
-        % update memory, wipe some
-        %according to k, what's susceptible to distortion?
-        %vulnerable = 1:size(x,3) > k; 
-        %flip = find(rand(sum(vulnerable),3)>0.5); %above capacity, drop with 50% probability
-        %chance of information loss
-        % x(:,:,k+1:end) = []; %for now, delete ANY info above k
-        %assign random p? randomly assign 0 or 1?
+        % wipe any information above capacity limit k
+        if k > 0; x(:,:,k+1:end) = []; end
         
     end %end of trial by trial loop
 end %end of block by block loop
