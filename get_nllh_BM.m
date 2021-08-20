@@ -1,10 +1,6 @@
 function [nllh] = get_nllh_BM(params)
 % fit WMP data with Bayesian Model (BI) 
-% Where x is all the reward information you have for that stimulus
 llh = 0;
-%p(C|x) = U_C*p(C)*p(x|C)
-%p(C|x_vec) = U_C*p(C)*p(x_1|C)*p(x_2|C)*...*p(x_t|C)
-%uninformative prior, re-update posterior every time, don't just learn
 
 global k onesubj model
 data = onesubj; 
@@ -89,9 +85,11 @@ for b = 1:length(unique(data.block))
 
 %             [~,which] = max(p_r1); r1 = xs(which);
 %             [~,which] = max(p_r0); r0 = xs(which);
+
             r1 = sum(xs.*p_r1); r0 = sum(xs.*p_r0);
+            
             if sum(isnan(p_r1))>0 | sum(isnan(p_r0))>0
-                blah = true
+                broken = true
             end
             
             % learn!

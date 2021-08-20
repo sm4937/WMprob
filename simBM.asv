@@ -93,9 +93,8 @@ for b = 1:length(unique(data.block))
 %         [~,which] = max(p_r0); r0 = xs(which);
 
         r1 = sum(xs.*p_r1); r0 = sum(xs.*p_r0); %integrate over p_r1, p_r0
-        
-        if sum(isnan(p_r1))>0 | sum(isnan(p_r0))>0 %if there's a NaN present, throw a flag
-            broken = true
+        if sum(isnan(p_r1))>0 | sum(isnan(p_r0))>0 %if there's a NaN present, t
+            blah = true
         end
         
         % learn!
@@ -141,6 +140,9 @@ for b = 1:length(unique(data.block))
         if k > 0; x(:,:,k+1:end) = []; end %delete all info outside capacity
       
     end %end of trial by trial loop
+    % rewards_sim = [rewards_sim; rewards]; 
+    %resp_sim = [resp_sim; resp_vec];
+    % cor_sim = [cor_sim; cor_vec];
 end %end of block by block loop
 
 simdata = data; %everything else was the same from real data except responses/rewards
