@@ -93,30 +93,37 @@ clear simdata fitparams tries nllhs_tries nllhs
 maxk = 15; global k model; ks = zeros(N,1); %ks = ceil(rand(N,1)*maxk);
 
 %specify which BM model to run
-model = {'epsilon','forget'};
-BMparamnames = {'\epsilon','forget'}; 
+model = {'epsilon','forget','a1_bino','b1_bino','a0_bino','b0_bino'};
+BMparamnames = {'\epsilon','forget','\alpha1_b','\beta1_b','\alpha0_b','\beta0_b'}; 
 
-BMparams = [normrnd(0.1,0.05,N,1) normrnd(0.103,0.07,N,1)]; %epsilon, then forget rate
+BMparams = [normrnd(0.1,0.05,N,1) normrnd(0.103,0.07,N,1) ...
+    normrnd(2,0.25,N,1) normrnd(2,0.25,N,1) normrnd(2,0.25,N,1) ...
+    normrnd(2,0.25,N,1)]; %epsilon, forget rate, then 4 
+    % binomial prior parameters, alpha_bino & beta_bino for each 
+    % inference condition (0 and 1)
+    % alpha bino and beta bino should always be 1 or greater, to avoid issues
+    % with beta function
 BMparams(BMparams(:,2)<0,2) = 0.01; % don't let forget rate be negative
 BMparams(BMparams(:,1)<0,1) = 0.01; % don't let epsilon be negative, either
 
 nparamsBM = length(model);
 lb = zeros(1,nparamsBM); ub = ones(1,nparamsBM);
+lb(contains(model,{'a1_bino','b1_bino','a0_bino','b0_bino'})) = 0; ub(contains(model,{'a1_bino','b1_bino','a0_bino','b0_bino'})) = 5;
 niters = 5; %5 seems to be where fitting curve stabilizes at a min
 tries = cell(N,1); nllhs_tries = cell(N,1);
 
 % find parameters which produce reasonable curves (separation between ns
 % conditions) and then do gen/rec with those
-fitflag = true;
+fitflag = false;
 if fitflag %don't run this whole thing unless you have to
     for s = 1:N
         k = ks(s);
         tries{s} = NaN(niters,nparamsBM); nllhs_tries{s} = NaN(niters,1); %save for simpler BM model
-        simdata{s} = simBM_v02(BMparams(s,:),data{s},model);
+        simdata{s} = simBM(BMparams(s,:),data{s},model);
         onesubj = simdata{s};
         for ii = 1:niters
             inits = rand(1,nparamsBM); 
-            [tries{s}(ii,:),nllhs_tries{s}(ii,:)] = fmincon(@get_nllh_BM_v02,inits,[],[],[],[],lb,ub);
+            [tries{s}(ii,:),nllhs_tries{s}(ii,:)] = fmincon(@get_nllh_BM,inits,[],[],[],[],lb,ub);
         end
         [nllhs(s),which] = min(nllhs_tries{s});fitparams(s,:) = tries{s}(which,:); %save best of all tries for each subject
     end
@@ -125,6 +132,7 @@ else
 end
 
 % Plot learning curves for simulated bayesian subjects
+figure(2)
 subplot(2,2,3)
 SLM_plot_learningcurves(simdata)
 title('Learning curve for BI')
@@ -132,8 +140,9 @@ fig = gcf; fig.Color = 'w';
 
 figure
 % %plot generate/recover from BM model
+fitparams(:,contains(model,'bino')) = exp(fitparams(:,contains(model,'bino')));
 for p = 1:nparamsBM
-    subplot(1,2,p)
+    subplot(3,3,p)
     scatter(BMparams(:,p),fitparams(:,p),'Filled')
     hold on
     plot([0 1],[0 1],'k--')
@@ -144,13 +153,14 @@ for p = 1:nparamsBM
 end
 
 % % NOW THE SAME FOR THE ORIGINAL RLWM MODEL % % 
-model = {'epsilon','alpha','rho3','rho6','forget'};
-RLWMparamnames = {'\epsilon','\alpha','\rho_3','\rho_6','forget'};
-RLWMparams = [normrnd(0.05,0.01,N,1) normrnd(0.1,0.25,N,1) normrnd(0.5,0.1,N,1) normrnd(0.3,0.1,N,1) normrnd(0.1,0.25,N,1)];
+model = {'epsilon','alpha','rho3','rho6','forget','beta'};
+RLWMparamnames = {'\epsilon','\alpha','\rho_3','\rho_6','forget','\beta'};
+RLWMparams = [normrnd(0.05,0.01,N,1) normrnd(0.1,0.25,N,1) normrnd(0.5,0.1,N,1) normrnd(0.3,0.1,N,1) normrnd(0.1,0.25,N,1) normrnd(1,0.25,N,1)];
 RLWMparams(RLWMparams(:,1)<0,1) = 0; %epsilon should be small but NEVER negative
 RLWMparams(RLWMparams(:,2)<0,2) = 0.01; %alpha should also stay positive
 RLWMparams(RLWMparams(:,5)<0,5) = 0; %same w forget rate (here, just for WM)
 nparamsRLWM = size(RLWMparams,2); lb = zeros(1,nparamsRLWM); ub = ones(1,nparamsRLWM);
+lb(contains(model,'beta')) = -Inf; ub(contains(model,'beta')) = Inf;
 
 clear nllhs fitparams
 for s = 1:N
@@ -199,15 +209,15 @@ if fitflag %want to run? it'll take forever!
             inits = rand(1,nparamsRL); 
             [tries_RL{s}(ii,:),nllhs_tries_RL{s}(ii,:)] = fmincon(@get_nllh_RL,inits,[],[],[],[],zeros(1,nparamsRL),ones(1,nparamsRL));
         end %iterate over RL values
-        model = {'epsilon','forget'};
+        model = {'epsilon','forget','a1_bino','b1_bino','a0_bino','b0_bino'};
         tries_BM{s} = NaN(niters,nparamsBM); nllhs_tries_BM{s} = NaN(niters,1);
-        for ii = 1:niters %use xx starting points per subject... it's not very consistent for BM, compared to RL
+        for ii = 1:niters-2 %this takes a long time, so shorten a little
             inits = rand(1,nparamsBM); 
-            [tries_BM{s}(ii,:),nllhs_tries_BM{s}(ii,:)] = fmincon(@get_nllh_BM_v02,inits,[],[],[],[],zeros(1,nparamsBM),ones(1,nparamsBM));
+            [tries_BM{s}(ii,:),nllhs_tries_BM{s}(ii,:)] = fmincon(@get_nllh_BM,inits,[],[],[],[],zeros(1,nparamsBM),ones(1,nparamsBM));
         end
         model = {'epsilon','alpha','rho3','rho6','forget'};
         tries_RLWM{s} = NaN(niters,nparamsRLWM); nllhs_tries_RLWM{s} = NaN(niters,1);
-        for ii = 1:niters+10 %use xx starting points per subject... it's not very consistent for BM, compared to RL
+        for ii = 1:niters+10 %takes a while to search entire param space
             inits = rand(1,nparamsRLWM); 
             [tries_RLWM{s}(ii,:),nllhs_tries_RLWM{s}(ii,:)] = fmincon(@get_nllh_RLWM,inits,[],[],[],[],zeros(1,nparamsRLWM),ones(1,nparamsRLWM));
         end
@@ -216,8 +226,8 @@ if fitflag %want to run? it'll take forever!
         [nllhs_RLWM(s,:),which] = min(nllhs_tries_RLWM{s}); fitparams_RLWM(s,:) = tries_RLWM{s}(which,:); %save best of all tries for each subject    
     end
 else
-    %load('realfits.mat')
-    load('realfits_v02.mat')
+    load('realfits.mat')
+    %load('realfits_v02.mat')
 end
 s = 35;
 ntrials = length(data{s}.resp);
@@ -243,10 +253,13 @@ title('N subjects best fit by model')
 xticklabels({'RL','BI','RLWM'})
 fig = gcf; fig.Color = 'w';
 
+model = {'epsilon','forget','a1_bino','b1_bino','a0_bino','b0_bino'};
+%fitparams_BM(:,contains(model,{'bino'})) = exp(fitparams_BM(:,contains(model,{'bino'})));
+
 % % Re-plot learning curves based on fit parameter values
 for s = 1:N
     simdataRL{s} = simRL(fitparams_RL(s,:),data{s});
-    model = {'epsilon','forget'};
+    model = {'epsilon','forget','a1_bino','b1_bino','a0_bino','b0_bino'};
     simdataBM{s} = simBM(fitparams_BM(s,:),data{s},model); %simulate with fit params
     model = {'epsilon','alpha','rho3','rho6','forget'};
     simdataRLWM{s} = simRLWM(fitparams_RLWM(s,:),data{s},model);

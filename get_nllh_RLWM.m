@@ -10,8 +10,9 @@ data = onesubj;
 %default parameter values
 beta = 100; forget = 0; epsilon = 0; alpha = 0; rho3 = 0.5; rho6 = 0.5;
 if sum(contains(model,'beta'))
-    beta = params(contains(model,'beta'))*100;
+    logbeta = params(contains(model,'beta'));
     % shared across RL & WM, free or fixed (most likely this will be fixed)
+    beta = exp(logbeta); %fit in log space for ease of search
 end
 if sum(contains(model,'alpha'))
     alpha = params(contains(model,'alpha'));
