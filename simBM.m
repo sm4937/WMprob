@@ -2,6 +2,13 @@ function [simdata] = simBM(params,data,model)
 % simBM
 % sim WMP data with BM model
 
+% P needs to be marginal over C, r1, r0
+% meshgrid(C,r1,r0)
+% C (rows) x r1 (cols) x r0 (3rd-d)
+% Normalize over everything so entire total is 1
+% Loop over C's, given that C is your response
+% correct or incorrect?
+
 global k
 beta = 100; forget = 0; epsilon = 0; alphabino = 1; betabino = 1; 
 % start with uninformative alphabino = betabino = 1;

@@ -201,7 +201,7 @@ tries_RL = cell(N,1); nllhs_tries_RL = cell(N,1);
 tries_BM = cell(N,1); nllhs_tries_BM = cell(N,1);
 tries_RLWM = cell(N,1); nllhs_tries_RLWM = cell(N,1);
 
-fitflag = true;
+fitflag = false;
 if fitflag %want to run? it'll take forever!
     for s = 1:N
         onesubj = data{s}; tries_RL{s} = NaN(niters,nparamsRL); nllhs_tries_RL{s} = NaN(niters,1); 
