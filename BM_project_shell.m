@@ -43,6 +43,8 @@ for s = 1:N
     end
 end
 
+%% Temporary division of code
+
 % Use all of this to do a gen/rec with an RL model
 global onesubj
 RLparamnames = {'\alpha','\epsilon','forget'};
@@ -114,16 +116,16 @@ tries = cell(N,1); nllhs_tries = cell(N,1);
 
 % find parameters which produce reasonable curves (separation between ns
 % conditions) and then do gen/rec with those
-fitflag = false;
+fitflag = true;
 if fitflag %don't run this whole thing unless you have to
     for s = 1:N
         k = ks(s);
         tries{s} = NaN(niters,nparamsBM); nllhs_tries{s} = NaN(niters,1); %save for simpler BM model
-        simdata{s} = simBM(BMparams(s,:),data{s},model);
+        simdata{s} = simBM_v03(BMparams(s,:),data{s},model);
         onesubj = simdata{s};
         for ii = 1:niters
             inits = rand(1,nparamsBM); 
-            [tries{s}(ii,:),nllhs_tries{s}(ii,:)] = fmincon(@get_nllh_BM,inits,[],[],[],[],lb,ub);
+            [tries{s}(ii,:),nllhs_tries{s}(ii,:)] = fmincon(@get_nllh_BM_v03,inits,[],[],[],[],lb,ub);
         end
         [nllhs(s),which] = min(nllhs_tries{s});fitparams(s,:) = tries{s}(which,:); %save best of all tries for each subject
     end

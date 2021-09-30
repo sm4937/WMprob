@@ -1,3 +1,9 @@
+% P needs to be marginal over C, r1, r0
+% meshgrid(C,r1,r0)
+% C (rows) x r1 (cols) x r0 (3rd-d)
+% Normalize over everything so entire total is 1
+% Loop over C's, given that C_hat was your response
+% was it correct or incorrect?
 
 % Define 3d posterior (over C, r1, and r0)
 % (use meshgrid)
